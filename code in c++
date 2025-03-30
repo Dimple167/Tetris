@@ -1,0 +1,207 @@
+#include <iostream>
+#include <vector>
+#include <fstream>
+#include <conio.h>
+#include <ctime>
+#include <windows.h>
+#include <algorithm>
+
+using namespace std;
+
+const int BOARD_WIDTH = 10;
+const int BOARD_HEIGHT = 20;
+
+vector<vector<int>> board(BOARD_HEIGHT, vector<int>(BOARD_WIDTH, 0));
+int score = 0;
+int highScore = 0;
+
+struct Tetromino {
+    vector<vector<int>> shape;
+    int x, y;
+    Tetromino(vector<vector<int>> s) : shape(s), x(BOARD_WIDTH / 2 - 1), y(0) {}
+};
+
+vector<Tetromino> tetrominos = {
+    Tetromino({{1, 1}, {1, 1}}),
+    Tetromino({{0, 1, 0}, {1, 1, 1}}),
+    Tetromino({{1, 1, 0}, {0, 1, 1}}),
+    Tetromino({{0, 1, 1}, {1, 1, 0}}),
+    Tetromino({{1, 0, 0}, {1, 1, 1}}),
+    Tetromino({{0, 0, 1}, {1, 1, 1}}),
+    Tetromino({{1, 1, 1, 1}})
+};
+
+void loadHighScore() {
+    ifstream file("highscore.txt");
+    if (file) file >> highScore;
+    file.close();
+}
+
+void saveHighScore() {
+    ofstream file("highscore.txt");
+    file << highScore;
+    file.close();
+}
+void drawBoard(const Tetromino& tetromino) {
+    // Move the cursor to the top-left instead of clearing the screen
+    COORD coord = {0, 0};
+    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
+
+    vector<vector<int>> tempBoard = board;
+    for (int y = 0; y < tetromino.shape.size(); ++y)
+        for (int x = 0; x < tetromino.shape[y].size(); ++x)
+            if (tetromino.shape[y][x])
+                tempBoard[tetromino.y + y][tetromino.x + x] = 2;
+
+    for (int y = 0; y < BOARD_HEIGHT; ++y) {
+        for (int x = 0; x < BOARD_WIDTH; ++x)
+            cout << (tempBoard[y][x] ? "# " : ". ");
+        cout << endl;
+    }
+    cout << "Score: " << score << "  High Score: " << highScore << endl;
+    cout << "Controls: A/D - Move Left/Right, S - Move Down" << endl;
+    cout << "          Space - Hard Drop, Up Arrow/R - Rotate, Q - Quit" << endl;
+}
+bool checkCollision(const Tetromino& tetromino) {
+    for (int y = 0; y < tetromino.shape.size(); ++y)
+        for (int x = 0; x < tetromino.shape[y].size(); ++x)
+            if (tetromino.shape[y][x]) {
+                int boardX = tetromino.x + x;
+                int boardY = tetromino.y + y;
+                if (boardX < 0 || boardX >= BOARD_WIDTH || boardY >= BOARD_HEIGHT || (boardY >= 0 && board[boardY][boardX]))
+                    return true;
+            }
+    return false;
+}
+
+void mergeTetromino(const Tetromino& tetromino) {
+    for (int y = 0; y < tetromino.shape.size(); ++y)
+        for (int x = 0; x < tetromino.shape[y].size(); ++x)
+            if (tetromino.shape[y][x])
+                board[tetromino.y + y][tetromino.x + x] = 1;
+}
+
+void clearLines() {
+    for (int y = BOARD_HEIGHT - 1; y >= 0; --y) {
+        bool lineFull = true;
+        for (int x = 0; x < BOARD_WIDTH; ++x) {
+            if (board[y][x] == 0) {
+                lineFull = false;
+                break;
+            }
+        }
+        
+        if (lineFull) {
+            board.erase(board.begin() + y);
+            board.insert(board.begin(), vector<int>(BOARD_WIDTH, 0));
+            score += 100;
+            if (score > highScore) {
+                highScore = score;
+                saveHighScore();
+            }
+            y++; // Check the same row again since we moved rows down
+        }
+    }
+}
+
+void rotateTetromino(Tetromino& tetromino) {
+    // Get dimensions of the current shape
+    int rows = tetromino.shape.size();
+    int cols = tetromino.shape[0].size();
+    
+    // Create new shape with swapped dimensions
+    vector<vector<int>> newShape(cols, vector<int>(rows, 0));
+    
+    // Rotate 90 degrees clockwise
+    for (int y = 0; y < rows; ++y)
+        for (int x = 0; x < cols; ++x)
+            newShape[x][rows - 1 - y] = tetromino.shape[y][x];
+    
+    // Check if rotation is valid
+    Tetromino temp = tetromino;
+    temp.shape = newShape;
+    if (!checkCollision(temp)) tetromino.shape = newShape;
+}
+
+void gameCountdown() {
+    for (int i = 3; i > 0; --i) {
+        system("cls");
+        cout << "Game starts in " << i << "..." << endl;
+        Sleep(1000);
+    }
+}
+
+int main() {
+    srand(time(0));
+    loadHighScore();
+    gameCountdown();
+    Tetromino currentTetromino = tetrominos[rand() % tetrominos.size()];
+    
+    clock_t lastFall = clock();
+    const clock_t fallSpeed = CLOCKS_PER_SEC / 2; // Fall every half second
+    
+    while (true) {
+        if (_kbhit()) {
+            char input = _getch();
+            switch (input) {
+                case 'a': 
+                case 'A': 
+                    currentTetromino.x--; 
+                    if (checkCollision(currentTetromino)) currentTetromino.x++; 
+                    break;
+                case 'd': 
+                case 'D': 
+                    currentTetromino.x++; 
+                    if (checkCollision(currentTetromino)) currentTetromino.x--; 
+                    break;
+                case 's': 
+                case 'S': 
+                    currentTetromino.y++; 
+                    if (checkCollision(currentTetromino)) currentTetromino.y--; 
+                    break;
+                case ' ': 
+                    while (!checkCollision(currentTetromino)) currentTetromino.y++; 
+                    currentTetromino.y--; 
+                    break;
+                case 'r': 
+                case 'R': 
+                    rotateTetromino(currentTetromino); 
+                    break;
+                case 'q': 
+                case 'Q': 
+                    return 0;
+                case 224: // Special key prefix
+                case 0:   // Alternative prefix
+                    input = _getch(); // Get the second byte
+                    if (input == 72) { // Up arrow
+                        rotateTetromino(currentTetromino);
+                    }
+                    break;
+            }
+        }
+        
+        // Handle automatic falling with timing
+        clock_t currentTime = clock();
+        if (currentTime - lastFall > fallSpeed) {
+            currentTetromino.y++;
+            if (checkCollision(currentTetromino)) {
+                currentTetromino.y--;
+                mergeTetromino(currentTetromino);
+                clearLines();
+                currentTetromino = tetrominos[rand() % tetrominos.size()];
+                if (checkCollision(currentTetromino)) {
+                    drawBoard(currentTetromino);
+                    cout << "Game Over!" << endl;
+                    cout << "Final Score: " << score << endl;
+                    Sleep(2000);
+                    break;
+                }
+            }
+            lastFall = currentTime;
+        }
+        
+        drawBoard(currentTetromino);
+        Sleep(50); // Short sleep to reduce CPU usage
+    }
+    return 0;
+}
