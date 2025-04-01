@@ -11,6 +11,22 @@ using namespace std;
 const int BOARD_WIDTH = 10;
 const int BOARD_HEIGHT = 20;
 
+// Color codes for Windows console
+const int EMPTY_COLOR = 0;         // Black
+const int BORDER_COLOR = 15;       // White
+const int TEXT_COLOR = 15;         // White
+
+// Colors for different tetromino shapes
+const int SHAPE_COLORS[] = {
+    10,  // I (Light Green)
+    11,  // J (Light Cyan)
+    12,  // L (Light Red)
+    13,  // O (Light Purple)
+    14,  // S (Yellow)
+    9,   // T (Light Blue)
+    5    // Z (Dark Purple)
+};
+
 vector<vector<int>> board(BOARD_HEIGHT, vector<int>(BOARD_WIDTH, 0));
 int score = 0;
 int highScore = 0;
@@ -18,18 +34,24 @@ int highScore = 0;
 struct Tetromino {
     vector<vector<int>> shape;
     int x, y;
-    Tetromino(vector<vector<int>> s) : shape(s), x(BOARD_WIDTH / 2 - 1), y(0) {}
+    int colorIndex; // Index for color in SHAPE_COLORS
+    Tetromino(vector<vector<int>> s, int c) : shape(s), x(BOARD_WIDTH / 2 - 1), y(0), colorIndex(c) {}
 };
 
 vector<Tetromino> tetrominos = {
-    Tetromino({{1, 1}, {1, 1}}),
-    Tetromino({{0, 1, 0}, {1, 1, 1}}),
-    Tetromino({{1, 1, 0}, {0, 1, 1}}),
-    Tetromino({{0, 1, 1}, {1, 1, 0}}),
-    Tetromino({{1, 0, 0}, {1, 1, 1}}),
-    Tetromino({{0, 0, 1}, {1, 1, 1}}),
-    Tetromino({{1, 1, 1, 1}})
+    Tetromino({{1, 1, 1, 1}}, 0),               // I (cyan)
+    Tetromino({{1, 0, 0}, {1, 1, 1}}, 1),       // J (blue)
+    Tetromino({{0, 0, 1}, {1, 1, 1}}, 2),       // L (orange)
+    Tetromino({{1, 1}, {1, 1}}, 3),             // O (yellow)
+    Tetromino({{0, 1, 1}, {1, 1, 0}}, 4),       // S (green)
+    Tetromino({{0, 1, 0}, {1, 1, 1}}, 5),       // T (purple)
+    Tetromino({{1, 1, 0}, {0, 1, 1}}, 6)        // Z (red)
 };
+
+// Function to set console color
+void setColor(int color) {
+    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
+}
 
 void loadHighScore() {
     ifstream file("highscore.txt");
@@ -42,26 +64,91 @@ void saveHighScore() {
     file << highScore;
     file.close();
 }
+
 void drawBoard(const Tetromino& tetromino) {
     // Move the cursor to the top-left instead of clearing the screen
     COORD coord = {0, 0};
     SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 
-    vector<vector<int>> tempBoard = board;
+    vector<vector<int>> tempBoard(BOARD_HEIGHT, vector<int>(BOARD_WIDTH, 0));
+    
+    // Copy the board state
+    for (int y = 0; y < BOARD_HEIGHT; ++y)
+        for (int x = 0; x < BOARD_WIDTH; ++x)
+            tempBoard[y][x] = board[y][x] ? board[y][x] : 0;
+    
+    // Add current tetromino with its specific color
     for (int y = 0; y < tetromino.shape.size(); ++y)
         for (int x = 0; x < tetromino.shape[y].size(); ++x)
             if (tetromino.shape[y][x])
-                tempBoard[tetromino.y + y][tetromino.x + x] = 2;
+                tempBoard[tetromino.y + y][tetromino.x + x] = tetromino.colorIndex + 1; // +1 because 0 is empty
+
+    // Draw top border
+    setColor(BORDER_COLOR);
+    cout << "+";
+    for (int x = 0; x < BOARD_WIDTH * 2 - 1; ++x) cout << "-";
+    cout << "+" << endl;
 
     for (int y = 0; y < BOARD_HEIGHT; ++y) {
-        for (int x = 0; x < BOARD_WIDTH; ++x)
-            cout << (tempBoard[y][x] ? "# " : ". ");
-        cout << endl;
+        setColor(BORDER_COLOR);
+        cout << "|";
+        
+        for (int x = 0; x < BOARD_WIDTH; ++x) {
+            int cell = tempBoard[y][x];
+            if (cell > 0) {
+                setColor(SHAPE_COLORS[cell - 1]); // -1 to get the correct color index
+                cout << "[]";
+            } else {
+                setColor(EMPTY_COLOR);
+                cout << "  ";
+            }
+        }
+        
+        setColor(BORDER_COLOR);
+        cout << "|" << endl;
     }
-    cout << "Score: " << score << "  High Score: " << highScore << endl;
-    cout << "Controls: A/D - Move Left/Right, S - Move Down" << endl;
-    cout << "          Space - Hard Drop, Up Arrow/R - Rotate, Q - Quit" << endl;
+
+    // Draw bottom border
+    setColor(BORDER_COLOR);
+    cout << "+";
+    for (int x = 0; x < BOARD_WIDTH * 2 - 1; ++x) cout << "-";
+    cout << "+" << endl;
+
+    // Draw score and controls
+    setColor(TEXT_COLOR);
+    cout << "Score: ";
+    setColor(14); // Yellow for score
+    cout << score;
+    setColor(TEXT_COLOR);
+    cout << "  High Score: ";
+    setColor(10); // Green for high score
+    cout << highScore << endl;
+    
+    setColor(TEXT_COLOR);
+    cout << "Controls: ";
+    setColor(11); // Light cyan for controls
+    cout << "A/D";
+    setColor(TEXT_COLOR);
+    cout << " - Move Left/Right, ";
+    setColor(11);
+    cout << "S";
+    setColor(TEXT_COLOR);
+    cout << " - Move Down" << endl;
+    cout << "          ";
+    setColor(11);
+    cout << "Space";
+    setColor(TEXT_COLOR);
+    cout << " - Hard Drop, ";
+    setColor(11);
+    cout << "Up Arrow/R";
+    setColor(TEXT_COLOR);
+    cout << " - Rotate, ";
+    setColor(11);
+    cout << "Q";
+    setColor(TEXT_COLOR);
+    cout << " - Quit" << endl;
 }
+
 bool checkCollision(const Tetromino& tetromino) {
     for (int y = 0; y < tetromino.shape.size(); ++y)
         for (int x = 0; x < tetromino.shape[y].size(); ++x)
@@ -78,20 +165,20 @@ void mergeTetromino(const Tetromino& tetromino) {
     for (int y = 0; y < tetromino.shape.size(); ++y)
         for (int x = 0; x < tetromino.shape[y].size(); ++x)
             if (tetromino.shape[y][x])
-                board[tetromino.y + y][tetromino.x + x] = 1;
+                board[tetromino.y + y][tetromino.x + x] = tetromino.colorIndex + 1; // Store color index
 }
 
-void clearLines() {
+void clearrows() {
     for (int y = BOARD_HEIGHT - 1; y >= 0; --y) {
-        bool lineFull = true;
+        bool rowFull = true;
         for (int x = 0; x < BOARD_WIDTH; ++x) {
             if (board[y][x] == 0) {
-                lineFull = false;
+                rowFull = false;
                 break;
             }
         }
         
-        if (lineFull) {
+        if (rowFull) {
             board.erase(board.begin() + y);
             board.insert(board.begin(), vector<int>(BOARD_WIDTH, 0));
             score += 100;
@@ -105,19 +192,15 @@ void clearLines() {
 }
 
 void rotateTetromino(Tetromino& tetromino) {
-    // Get dimensions of the current shape
     int rows = tetromino.shape.size();
     int cols = tetromino.shape[0].size();
     
-    // Create new shape with swapped dimensions
     vector<vector<int>> newShape(cols, vector<int>(rows, 0));
     
-    // Rotate 90 degrees clockwise
     for (int y = 0; y < rows; ++y)
         for (int x = 0; x < cols; ++x)
             newShape[x][rows - 1 - y] = tetromino.shape[y][x];
     
-    // Check if rotation is valid
     Tetromino temp = tetromino;
     temp.shape = newShape;
     if (!checkCollision(temp)) tetromino.shape = newShape;
@@ -126,7 +209,12 @@ void rotateTetromino(Tetromino& tetromino) {
 void gameCountdown() {
     for (int i = 3; i > 0; --i) {
         system("cls");
-        cout << "Game starts in " << i << "..." << endl;
+        setColor(TEXT_COLOR);
+        cout << "Game starts in ";
+        setColor(12); // Red for countdown
+        cout << i;
+        setColor(TEXT_COLOR);
+        cout << "..." << endl;
         Sleep(1000);
     }
 }
@@ -180,19 +268,22 @@ int main() {
             }
         }
         
-        // Handle automatic falling with timing
         clock_t currentTime = clock();
         if (currentTime - lastFall > fallSpeed) {
             currentTetromino.y++;
             if (checkCollision(currentTetromino)) {
                 currentTetromino.y--;
                 mergeTetromino(currentTetromino);
-                clearLines();
+                clearrows();
                 currentTetromino = tetrominos[rand() % tetrominos.size()];
                 if (checkCollision(currentTetromino)) {
                     drawBoard(currentTetromino);
+                    setColor(TEXT_COLOR);
                     cout << "Game Over!" << endl;
-                    cout << "Final Score: " << score << endl;
+                    cout << "Final Score: ";
+                    setColor(14); // Yellow for final score
+                    cout << score << endl;
+                    setColor(TEXT_COLOR);
                     Sleep(2000);
                     break;
                 }
